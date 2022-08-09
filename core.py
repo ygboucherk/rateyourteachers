@@ -66,24 +66,30 @@ class Core(object):
             self.hash = w3.keccak(self.content)
             self.signer = w3.eth.account.recoverHash(self.hash, signature=self.sig)
             
-    class ReadRequest(object)
-        self.content = content
+    class ReadRequest(object):
+        def __init__(self, content):
+            self.content = content
         
-    self.teachers = {}
-    self.accounts = {}
-    self.addrsListLocation = "addrs.dat"
+    def __init__(self):
+        self.teachers = {}
+        self.accounts = {}
+        self.addrsListLocation = "addrs.dat"
     
     
     def load(self):
         f = open(self.addrsListLocation, "r")
-        self.teachers = [Teacher(a) for a in f.read().splitlines()]
+        teachersData = [Teacher(a) for a in f.read().splitlines()]
+        for t in teachersData:
+            self.teachers[t.name] = t
         f.close()
         
     
     def getAccount(self, address):
         _addr = w3.toChecksumAddress(address)
         if not self.accounts.get(_addr):
-            self.accounts[]
+            self.accounts[_addr] = Account(_addr)
+    
+core = Core()
     
 @app.route("/write/grade")
 def writeGrade():
@@ -92,3 +98,11 @@ def writeGrade():
     encoded = eth_abi.encode_abi(["string", "string", "uint256"], ["newGrade", teacher, int(grade)])
     sig = flask.request.args.get("sig")
     WriteRequest("newGrade", encoded, sig)
+    
+@app.route("/teacher/<name>")
+def getTeacher(name):
+    d = core.teachers.get(name)
+    success = (not not d)
+    return flask.jsonify(result=d, success=True) if success else flask.jsonify(message="NOT_FOUND", success=False)
+    
+app.run()
