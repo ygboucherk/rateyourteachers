@@ -1,10 +1,10 @@
-import json, flask, eth_abi
+import json, flask, eth_abi, time
 from web3 import Web3, HTTPProvider
 from flask_cors import CORS
 
 app = flask.Flask(__name__)
 app.config["debug"] = False
-w3 = Web3(HTTPProvider("https://rpc.raptorchain.io/"))
+w3 = Web3(HTTPProvider("https://rpc.raptorchain.io/web3"))
 CORS(app)
 
 class Grade(object):
@@ -74,7 +74,9 @@ class Core(object):
             self.content = content
         
     def __init__(self):
+        self.port = 5000
         self.teachers = {}
+        self.teacherNames = []
         self.accounts = {}
         self.addrsListLocation = "addrs.dat"
     
@@ -85,6 +87,7 @@ class Core(object):
         teachersData = [Teacher(a) for a in self.addrs]
         for t in teachersData:
             self.teachers[t.name] = t
+            self.teacherNames.append(t.name)
         f.close()
         
     def save(self):
@@ -92,10 +95,10 @@ class Core(object):
         f.write(("\n").join(self.addrs))
         f.close()
     
-    def getAccount(self, address):
-        _addr = w3.toChecksumAddress(address)
-        if not self.accounts.get(_addr):
-            self.accounts[_addr] = Account(_addr)
+    def rateATeacher(self, rater, teacher, grade):
+        if not self.teachers.get(teacher):
+            return
+        self.teachers.get(teacher).rate(rater, grade)
     
 core = Core()
     
@@ -103,9 +106,10 @@ core = Core()
 def writeGrade():
     grade = flask.request.args.get("grade")
     teacher = flask.request.args.get("teacher")
-    encoded = eth_abi.encode_abi(["string", "string", "uint256"], ["newGrade", teacher, int(grade)])
+    encoded = eth_abi.encode_abi(["string", "uint256"], [teacher, int(grade)])
     sig = flask.request.args.get("sig")
-    WriteRequest("newGrade", encoded, sig)
+    rater = w3.eth.account.recoverHash(w3.keccak(encoded), signature=sig)
+    core.rateATeacher(rater, teacher, grade)
     
 @app.route("/teacher/<name>")
 def getTeacher(name):
@@ -113,4 +117,8 @@ def getTeacher(name):
     success = (not not d)
     return flask.jsonify(result=d, success=True) if success else flask.jsonify(message="NOT_FOUND", success=False)
     
-app.run()
+@app.route("/teachers")
+def teachersList():
+    return flask.jsonify(result=core.teacherNames)
+    
+app.run(port=core.port)
