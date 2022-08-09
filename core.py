@@ -26,6 +26,7 @@ class Teacher(object):
             
     def _load(self, initData):
         (self.name, self.grades) = (initData.get("name", ""), [Grade(infoDict=d) for d in initData.get("grades", [])])
+        self.raters = [g.rater for g in self.grades]
         self.updateAverage()
         
     def updateAverage(self):
@@ -39,6 +40,8 @@ class Teacher(object):
         f.close()
         
     def rate(self, rater, score):
+        if rater in self.raters:
+            return False
         self.grades.append(Grade(rater=rater, score=score))
         self.updateAverage()
         self.save()
@@ -78,11 +81,16 @@ class Core(object):
     
     def load(self):
         f = open(self.addrsListLocation, "r")
-        teachersData = [Teacher(a) for a in f.read().splitlines()]
+        self.addrs = f.read().splitlines()
+        teachersData = [Teacher(a) for a in self.addrs]
         for t in teachersData:
             self.teachers[t.name] = t
         f.close()
         
+    def save(self):
+        f = open(self.addrsListLocation, "w")
+        f.write(("\n").join(self.addrs))
+        f.close()
     
     def getAccount(self, address):
         _addr = w3.toChecksumAddress(address)
